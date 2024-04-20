@@ -26,3 +26,9 @@ Everyone has that annoying friend that sends way too long voice messages. Using 
 - Activation: you can activate or deactivate the bot with the command _/activate_.
 - Family friendly: you instruct the bot not to transcribe messages containing profanities. This option can be toggled on or off with the command _/family_friendly_.
 - Paraphraser: the bot will summarise messages that are more than 100 words long. This option can also be toggled on or off using the command _/paraphrase_.
+## Libraries used
+- pydub
+- TelegraBotAPI
+- telebot
+- HuggingFace API
+- whisper-timestamped
