@@ -1,9 +1,10 @@
 import telebot
 from keys import TELEGRAM_KEY, HUGGING_FACE_KEY
 import logging
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+# from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import requests
 import json
+import whisper_timestamped as whisper
 
 
 #=========LOGGER=========
@@ -162,10 +163,9 @@ def query_with_file(file):
     response = requests.request("POST", API_URL_S2T, headers=headers, data=data)
     return json.loads(response.content.decode("utf-8"))
 
-sample_audio = "sample2.wav"
-
-audio_out = query(sample_audio)
-print(audio_out)
+# sample_audio = "sample2.wav"
+# audio_out = query(sample_audio)
+# print(audio_out)
 
 @block_if_profane
 def send_text(message, audio_out):
@@ -180,10 +180,31 @@ def handle_docs_audio(message):
     downloaded_file = bot.download_file(audio_file.file_path)
     with open(file_path,'wb') as new_file:
         new_file.write(downloaded_file)
-    audio_out = query("temp_audio.ogg")
-    print(audio_out)
-    send_text(message, audio_out)
+    # audio_out = query("temp_audio.ogg")
+    # print("------------------")
+    # print("audio_out", audio_out)
+    # print("------------------")
+    # send_text(message, audio_out)
+    audio = whisper.load_audio("temp_audio.ogg")
+    model = whisper.load_model("tiny")
+    result = whisper.transcribe(model, audio)
     
+    word_time_pairs = []
+    for segment in result['segments']:
+        for word in segment['words']:
+            word_time_pairs.append({"text": word['text'], "start":word['start']})
+    # print(word_time_pairs)
+    output = "Time\tText"
+    for index, word in enumerate(word_time_pairs):
+        if (index % 5) == 0:
+            output += "\n" + str(word['start']) + "\t"
+        output += word['text'] + " "
+        
+    print("result", result)
+    print("------------------")
+    print(json.dumps(result, indent = 2, ensure_ascii = False))
+    print("------------------")
+    send_text(message, {"text":output})
 
 #==========Polling=========
 bot.infinity_polling()

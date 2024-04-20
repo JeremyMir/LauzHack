@@ -9,3 +9,5 @@ Pillow
 transformers
 torch
 openai
+pyTelegramBotAPI
+whisper-timestamped
