@@ -11,3 +11,4 @@ torch
 openai
 pyTelegramBotAPI
 whisper-timestamped
+ffmpeg
