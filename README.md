@@ -1,4 +1,4 @@
-# Bot transcirbing voice messages 
+# Bot transcribing voice messages 
 ## Intro
 Everyone has that annoying friend that sends way too long voice messages. Using our bot voice messages will be automatically transcribed into text. 
 ## Installation
