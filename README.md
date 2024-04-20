@@ -5,8 +5,9 @@ Everyone has that annoying friend who sends voice messages all the time. Well no
 The bot detects voice messages and transcribes them into text.
 
 ## Options
--Deactivate: you can activate/deactivate the bot with the command /activate
--family friendly: with the command family_friendly, you instruct the bot not to transcribe messages containing profaining.
--paraphraser: with the command /paraphrase, the bot will summarise messages more than 100 words long.
+- Activation: you can activate or deactivate the bot with the command _/activate_.
+- Family friendly: you instruct the bot not to transcribe messages containing profanities. This option can be toggled on or off with the command _/family_friendly_.
+- Paraphraser: the bot will summarise messages that are more than 100 words long. This option can also be toggled on or off using the command _/paraphrase_.
 
-# To run the bot, execute mybot.py
+# To run the bot
+Execute mybot.py after creating a keys.py file containing two string variables _TELEGRAM_KEY_ and _HUGGING_FACE_KEY_ containing the corresponding keys.
