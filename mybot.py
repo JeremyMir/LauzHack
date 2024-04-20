@@ -84,7 +84,7 @@ def start(message):
 #=========Commands=========
 bot.set_my_commands([
         telebot.types.BotCommand("/activate", "Activate/Deactivate the bot."),
-        telebot.types.BotCommand("/generate", "Jouer avec gpt2"), 
+        #telebot.types.BotCommand("/generate", "Jouer avec gpt2"), 
         telebot.types.BotCommand("/family_friendly", "Filter out profane audio messages."),
         telebot.types.BotCommand("/paraphrase", "Summarize audio messages more than 100 words long.")
         ])
