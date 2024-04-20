@@ -1,13 +1,18 @@
 
 from keys import TELEGRAM_KEY, HUGGING_FACE_KEY
 import logging
-#from transformers import GPT2LMHeadModel, GPT2Tokenizer
+# from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import requests
 import json
 import math
 from pydub import AudioSegment
 import telebot
 #import librosa
+import whisper_timestamped as whisper
+import ssl
+
+# Ignore SSL certificate verification
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 #=========LOGGER=========
@@ -237,10 +242,17 @@ def handle_docs_audio(message):
     if text==False:
         bot.send_message(message.chat.id, "An error occured.")
     else:
+        # Paraphrasing
+        paraphraseText = ""
         if len(text.split())>100 and bot.paraphraser:
-            text = paraphrase(text)
-        print(text)
-        send_text(message, text)
+            paraphraseText += "\n\n" + "Paraphrased voice message:\n" + paraphrase(text) 
+        # Time annotation
+        audio = whisper.load_audio("temp_audio.ogg")
+        model = whisper.load_model("tiny")
+        result = whisper.transcribe(model, audio)
+        originalText = timeAnnotation(result)
+        # Send in Telegram chat
+        send_text(message, originalText+paraphraseText)
 
 #==============Paraphrasing============================
 def paraphrase(text:str)->str:
@@ -253,7 +265,18 @@ def paraphrase(text:str)->str:
     response = requests.post(API_URL_PARAPHRASE, headers=headers, json=payload)
     return response.json()[0]['generated_text']
 
-    
+#======Time annotation======
+def timeAnnotation(result):
+    word_time_pairs = []
+    for segment in result['segments']:
+        for word in segment['words']:
+            word_time_pairs.append({"text": word['text'], "start":word['start']})
+    output = "Time\tText"
+    for index, word in enumerate(word_time_pairs):
+        if (index % 5) == 0:
+            output += "\n" + str(word['start']) + "\t"
+        output += word['text'] + " "
+    return output
 
 #==========Polling=========
 bot.infinity_polling()
