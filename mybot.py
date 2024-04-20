@@ -252,6 +252,7 @@ def handle_docs_audio(message):
         result = whisper.transcribe(model, audio)
         originalText = timeAnnotation(result)
         # Send in Telegram chat
+        send_text(message, text)
         send_text(message, originalText+paraphraseText)
 
 #==============Paraphrasing============================
