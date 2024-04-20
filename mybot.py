@@ -1,9 +1,13 @@
-import telebot
+
 from keys import TELEGRAM_KEY, HUGGING_FACE_KEY
 import logging
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+#from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import requests
 import json
+import math
+from pydub import AudioSegment
+import telebot
+#import librosa
 
 
 #=========LOGGER=========
@@ -19,6 +23,7 @@ class Speech2TextBot(telebot.TeleBot):
         super().__init__(apikey)
         self.activation = True
         self.family_friendly = False
+        self.paraphraser = True
 
     def change_activate(self):
         self.activation = not self.activation
@@ -26,6 +31,8 @@ class Speech2TextBot(telebot.TeleBot):
     def change_family_friendly(self):
         self.family_friendly = not self.family_friendly
 
+    def change_paraphraser(self):
+        self.paraphraser = not self.paraphraser
     
 bot = Speech2TextBot(TELEGRAM_KEY)
 
@@ -39,14 +46,14 @@ def do_if_activated(func):
     return if_activated
 
 def block_if_profane(func):
-    def if_profane(message, audio_out):
+    def if_profane(message, text):
         if bot.family_friendly:
-            if IsProfane(audio_out['text']):
+            if IsProfane(text):
                 bot.send_message(message.chat.id, "If you have nothing nice to say, don't say anything.")
             else:
-                return func(message, audio_out)
+                return func(message, text)
         else:
-            return func(message, audio_out)
+            return func(message, text)
     return if_profane
 
 def IsProfane(text:str)->bool:
@@ -96,21 +103,39 @@ def change_activation(call):
 
 #==========Family Friendly=================
 @bot.message_handler(commands=['family_friendly'])
-def activate(message):
+def fam_friendly(message):
     status_string = "family friendly" if bot.family_friendly else "uncensored"
     on_button = "Turn off family friendly mode" if bot.family_friendly else "Turn on family friendly mode"
-    bot.send_message(message.chat.id, f"The bot is currently {status_string}.", reply_markup=make_activation_button(on_button=on_button))
+    bot.send_message(message.chat.id, f"The bot is currently {status_string}.", reply_markup=make_family_button(on_button=on_button))
 
-def make_activation_button(on_button:str):
+def make_family_button(on_button:str):
     button = telebot.types.InlineKeyboardButton(text=on_button, callback_data="pg-13")
     markup = telebot.types.InlineKeyboardMarkup(row_width=1).add(button)
     return markup
 
 @bot.callback_query_handler(func= lambda call: call.data=="pg-13")
-def change_activation(call):
+def change_family(call):
     bot.change_family_friendly()
-    activate_string = "family friendly" if bot.family_friendly else "uncensored"
-    bot.send_message(call.message.chat.id, f"The bot is now {activate_string}.")
+    friendly_string = "family friendly" if bot.family_friendly else "uncensored"
+    bot.send_message(call.message.chat.id, f"The bot is now {friendly_string}.")
+
+#=============Paraphrasing======================
+@bot.message_handler(commands=['paraphrase'])
+def paraphrase_on(message):
+    status_string = "on" if bot.paraphraser else "off"
+    on_button = "Turn off paraphraser" if bot.paraphraser else "Turn on paraphraser"
+    bot.send_message(message.chat.id, f"The paraphraser is currently {status_string}.", reply_markup=make_paraphrase_button(on_button=on_button))
+
+def make_paraphrase_button(on_button:str):
+    button = telebot.types.InlineKeyboardButton(text=on_button, callback_data="summary")
+    markup = telebot.types.InlineKeyboardMarkup(row_width=1).add(button)
+    return markup
+
+@bot.callback_query_handler(func= lambda call: call.data=="summary")
+def change_family(call):
+    bot.change_paraphraser()
+    paraphrase_string = "on" if bot.paraphraser else "off"
+    bot.send_message(call.message.chat.id, f"The paraphraser is now {paraphrase_string}.")
 
 #=========Weird shit with huggingface==========
 
@@ -151,38 +176,82 @@ def generate(message):
 #===========Speech2Text===============
 #API_URL_S2T = "https://api-inference.huggingface.co/models/facebook/wav2vec2-base-960h"
 API_URL_S2T = "https://api-inference.huggingface.co/models/openai/whisper-large-v3"
-def query(filename):
-    with open(filename, "rb") as f:
+def query(filename, num_parts:int, length:float):
+    '''with open(filename, "rb") as f:
         data = f.read()
-    response = requests.request("POST", API_URL_S2T, headers=headers, data=data)
-    return json.loads(response.content.decode("utf-8"))
+        print(type(data))
+        print(len(data))
+    slice = len(data)/num_parts'''
+    return_str = ''
+    audio = AudioSegment.from_ogg(filename)
+    slice = len(audio)//num_parts
+    for part in range(int(num_parts)):
+        print(f'part {part} of {num_parts}')
+        print(slice)
+        print(part)
+        audio_slice=audio[slice*part:slice*(part+1)]
+        audio_slice.export("temp_slice.wav", format="wav")
+        with open("temp_slice.wav", 'rb') as f:
+            data_=f.read()
+        response = requests.request("POST", API_URL_S2T, headers=headers, data=data_)
+        output = json.loads(response.content.decode("utf-8"))
+        if 'error' in output:
+            print(output)
+            if num_parts > math.ceil(length/10)+2:
+                return False
+            else:
+                return query(filename, int(num_parts)+1, length)
+        return_str += output['text']
+    return return_str
 
-def query_with_file(file):
+'''def query_with_file(file):
     data=file.read()
     response = requests.request("POST", API_URL_S2T, headers=headers, data=data)
-    return json.loads(response.content.decode("utf-8"))
+    return json.loads(response.content.decode("utf-8"))'''
 
-sample_audio = "sample2.wav"
+'''sample_audio = "sample2.wav"
 
-audio_out = query(sample_audio)
-print(audio_out)
+audio_out = query(sample_audio, 1, 3)
+print(audio_out)'''
 
+#============Check for profanity=================
 @block_if_profane
-def send_text(message, audio_out):
-    bot.send_message(message.chat.id, audio_out['text'])
+def send_text(message, text):
+    bot.send_message(message.chat.id, text)
+
+#===========Speech2Text (suite)===============
 
 @bot.message_handler(content_types=['voice'])
 @do_if_activated
 def handle_docs_audio(message):
+    length = message.voice.duration
     audio_file = bot.get_file(message.voice.file_id)
-    #audio_out = query_with_file(audio_file)
     file_path = 'temp_audio.ogg'
     downloaded_file = bot.download_file(audio_file.file_path)
     with open(file_path,'wb') as new_file:
         new_file.write(downloaded_file)
-    audio_out = query("temp_audio.ogg")
-    print(audio_out)
-    send_text(message, audio_out)
+    #length = librosa.get_duration(filename='temp_audio.ogg')
+    num_parts=math.ceil(length/25)
+    text = query("temp_audio.ogg", num_parts, length)
+    if text==False:
+        bot.send_message(message.chat.id, "An error occured.")
+    else:
+        if len(text.split())>100 and bot.paraphraser:
+            text = paraphrase(text)
+        print(text)
+        send_text(message, text)
+
+#==============Paraphrasing============================
+def paraphrase(text:str)->str:
+    #Input: some text
+    #Ouput: a summary of the input
+    API_URL_PARAPHRASE = "https://api-inference.huggingface.co/models/humarin/chatgpt_paraphraser_on_T5_base"
+    payload = {
+        "inputs":text
+    }
+    response = requests.post(API_URL_PARAPHRASE, headers=headers, json=payload)
+    return response.json()[0]['generated_text']
+
     
 
 #==========Polling=========
