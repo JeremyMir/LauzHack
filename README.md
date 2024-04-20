@@ -3,11 +3,10 @@ Everyone has that annoying friend who sends voice messages all the time. Well no
 
 ## Installation
 
-# 1) create and activate virtual environment
-# -- EITHER with conda
+1) create and activate virtual environment
 conda create -n apis_env python=3.11
 conda activate apis_env
-# 2) install dependencies
+2) install dependencies
 (apis_env) pip3 install -r requirements.txt
 
 # Transcriptor
