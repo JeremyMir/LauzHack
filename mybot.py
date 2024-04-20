@@ -9,6 +9,10 @@ from pydub import AudioSegment
 import telebot
 #import librosa
 import whisper_timestamped as whisper
+import ssl
+
+# Ignore SSL certificate verification
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 #=========LOGGER=========
