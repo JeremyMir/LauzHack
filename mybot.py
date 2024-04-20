@@ -244,7 +244,7 @@ def handle_docs_audio(message):
     else:
         # Paraphrasing
         paraphraseText = ""
-        if len(text.split())>100 and bot.paraphraser:
+        if len(text.split())>15 and bot.paraphraser:
             paraphraseText += "\n\n" + "Paraphrased voice message:\n" + paraphrase(text) 
         # Time annotation
         audio = whisper.load_audio("temp_audio.ogg")
@@ -271,10 +271,10 @@ def timeAnnotation(result):
     for segment in result['segments']:
         for word in segment['words']:
             word_time_pairs.append({"text": word['text'], "start":word['start']})
-    output = "Time\tText"
+    output = "Transcribed voice message\nTime\tText"
     for index, word in enumerate(word_time_pairs):
         if (index % 5) == 0:
-            output += "\n" + str(word['start']) + "\t"
+            output += "\n" + "{:<6}".format(str(word['start'])) + "\t"
         output += word['text'] + " "
     return output
 
