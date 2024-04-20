@@ -10,27 +10,70 @@ import json
 logger = telebot.logger
 telebot.logger.setLevel(logging.DEBUG)
 
+#========Header for huggingface=============
+headers = {"Authorization": f"Bearer {HUGGING_FACE_KEY}"}
+
 #==========The Bot=========
 class Speech2TextBot(telebot.TeleBot):
     def __init__(self, apikey):
         super().__init__(apikey)
         self.activation = True
+        self.family_friendly = False
 
     def change_activate(self):
         self.activation = not self.activation
 
+    def change_family_friendly(self):
+        self.family_friendly = not self.family_friendly
+
     
 bot = Speech2TextBot(TELEGRAM_KEY)
 
+#===========Decorators============
+def do_if_activated(func):
+    def if_activated(message):
+        if bot.activation:
+            return func(message)
+        else:
+            pass
+    return if_activated
+
+def block_if_profane(func):
+    def if_profane(message, audio_out):
+        if bot.family_friendly:
+            if IsProfane(audio_out['text']):
+                bot.send_message(message.chat.id, "If you have nothing nice to say, don't say anything.")
+            else:
+                return func(message, audio_out)
+        else:
+            return func(message, audio_out)
+    return if_profane
+
+def IsProfane(text:str)->bool:
+    API_URL_PROFANE = "https://api-inference.huggingface.co/models/tarekziade/pardonmyai"
+    payload = {
+        "inputs":text
+    }
+    response = requests.post(API_URL_PROFANE, headers=headers, json=payload)
+    print(response.json())
+    scores = response.json()
+    if (scores[0][0]['score']<0.3 and scores[0][0]['label']=='NOT_OFFENSIVE') or (scores[0][0]['score']>0.7 and scores[0][0]['label']=='OFFENSIVE'):
+        return True
+    else:
+        return False
+
+
 #==========Welcome=========
 @bot.message_handler(commands=['start'])
+@do_if_activated
 def start(message):
     bot.send_message(message.chat.id, "Welcome!")
 
 #=========Commands=========
 bot.set_my_commands([
         telebot.types.BotCommand("/activate", "Activate/Deactivate the bot."),
-        telebot.types.BotCommand("/generate", "Jouer avec gpt2")
+        telebot.types.BotCommand("/generate", "Jouer avec gpt2"), 
+        telebot.types.BotCommand("/family_friendly", "Filter out profane audio messages.")
         ])
 
 #=========Activation=======
@@ -51,8 +94,26 @@ def change_activation(call):
     activate_string = "activated" if bot.activation else "disactivated"
     bot.send_message(call.message.chat.id, f"The bot has been {activate_string}.")
 
+#==========Family Friendly=================
+@bot.message_handler(commands=['family_friendly'])
+def activate(message):
+    status_string = "family friendly" if bot.family_friendly else "uncensored"
+    on_button = "Turn off family friendly mode" if bot.family_friendly else "Turn on family friendly mode"
+    bot.send_message(message.chat.id, f"The bot is currently {status_string}.", reply_markup=make_activation_button(on_button=on_button))
+
+def make_activation_button(on_button:str):
+    button = telebot.types.InlineKeyboardButton(text=on_button, callback_data="pg-13")
+    markup = telebot.types.InlineKeyboardMarkup(row_width=1).add(button)
+    return markup
+
+@bot.callback_query_handler(func= lambda call: call.data=="pg-13")
+def change_activation(call):
+    bot.change_family_friendly()
+    activate_string = "family friendly" if bot.family_friendly else "uncensored"
+    bot.send_message(call.message.chat.id, f"The bot is now {activate_string}.")
+
 #=========Weird shit with huggingface==========
-headers = {"Authorization": f"Bearer {HUGGING_FACE_KEY}"}
+
 API_URL = "https://api-inference.huggingface.co/models/openai-community/gpt2-large"
 
 parameters = {
@@ -76,6 +137,7 @@ outs = generate_answer(payload1)
 print(outs)
 
 @bot.message_handler(commands=['generate'])
+@do_if_activated
 def generate(message):
     text = message.text[9:]
     bot.send_message(message.chat.id, f"Your message is:{text}.")
@@ -105,9 +167,13 @@ sample_audio = "sample2.wav"
 audio_out = query(sample_audio)
 print(audio_out)
 
+@block_if_profane
+def send_text(message, audio_out):
+    bot.send_message(message.chat.id, audio_out['text'])
+
 @bot.message_handler(content_types=['voice'])
+@do_if_activated
 def handle_docs_audio(message):
-    
     audio_file = bot.get_file(message.voice.file_id)
     #audio_out = query_with_file(audio_file)
     file_path = 'temp_audio.ogg'
@@ -116,7 +182,8 @@ def handle_docs_audio(message):
         new_file.write(downloaded_file)
     audio_out = query("temp_audio.ogg")
     print(audio_out)
-    bot.send_message(message.chat.id, audio_out['text'])
+    send_text(message, audio_out)
+    
 
 #==========Polling=========
 bot.infinity_polling()
